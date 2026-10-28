@@ -1,0 +1,40 @@
+name: 予約投稿
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: cloud-post
+  cancel-in-progress: false
+
+jobs:
+  post:
+    runs-on: ubuntu-latest
+    steps:
+      - name: リポジトリを取得
+        uses: actions/checkout@v4
+
+      - name: 予約を確認して投稿
+        env:
+          IG_ACCESS_TOKEN: ${{ secrets.IG_ACCESS_TOKEN }}
+          REPO: ${{ github.repository }}
+        run: python3 scripts/cloud_post.py
+
+      - name: 結果を保存
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if ! git diff --cached --quiet; then
+            git commit -m "update queue and results"
+            # 押し出しに失敗すると次の回で同じ予約をもう一度投稿してしまうので、何度かやり直す
+            for i in 1 2 3 4 5; do
+              git pull --rebase origin main && git push && break
+              sleep 10
+            done
+          fi
