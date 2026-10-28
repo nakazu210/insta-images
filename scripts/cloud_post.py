@@ -236,6 +236,9 @@ def load_jobs():
 
 
 def main():
+    if os.environ.get("TEST_NOTIFY") == "true":  # 手動実行で通知だけ試す
+        notify_line("【インスタ予約】テスト通知です。この通知が届いていれば設定は完了です。")
+        return
     jobs = load_jobs()
     if not jobs:
         print("予約はありません")
