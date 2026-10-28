@@ -278,6 +278,7 @@ def main():
             posted_at = datetime.now(JST).isoformat(timespec="minutes")
             print(f"投稿完了: {label} ({did}) -> {link}")
             write_result(did, "posted", permalink=link, posted_at=posted_at)
+            notify_line(f"【インスタ予約】投稿しました\n{label}\n{link or '（リンクを取得できませんでした）'}")
         except Exception as e:
             print(f"投稿失敗: {label} ({did}): {e}")
             write_result(did, "failed", error=str(e))
