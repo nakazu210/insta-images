@@ -21,7 +21,7 @@ API = "https://graph.instagram.com/v22.0"
 MAX_IMAGES = 10
 MAX_CAPTION = 2200
 MAX_HASHTAGS = 30
-MISSED_HOURS = 6
+MISSED_HOURS = 2  # 予約時刻からこれ以上遅れたら投稿せず見送る
 JST = timezone(timedelta(hours=9))
 
 
@@ -177,6 +177,26 @@ def write_result(did, status, permalink=None, posted_at=None, error=None):
     )
 
 
+def notify_line(text):
+    """見送り・失敗をスマホ（LINE）に知らせる。設定がなければ何もしない"""
+    t = (os.environ.get("LINE_CHANNEL_ACCESS_TOKEN") or "").strip()
+    if not t:
+        print("LINEの設定がないので通知をスキップしました")
+        return
+    body = {"messages": [{"type": "text", "text": text}]}
+    user_id = (os.environ.get("LINE_USER_ID") or "").strip()
+    if user_id:
+        url, body["to"] = "https://api.line.me/v2/bot/message/push", user_id
+    else:
+        url = "https://api.line.me/v2/bot/message/broadcast"
+    req = urllib.request.Request(url, data=json.dumps(body).encode(), method="POST",
+                                 headers={"Authorization": f"Bearer {t}", "Content-Type": "application/json"})
+    try:
+        urllib.request.urlopen(req, timeout=30).close()
+    except Exception as e:
+        print(f"LINE通知に失敗: {e}")
+
+
 def load_jobs():
     jobs = []
     if not QUEUE_DIR.exists():
@@ -220,6 +240,7 @@ def main():
                 msg = f"予約時刻（{at_jst:%m/%d %H:%M}）から{MISSED_HOURS}時間以上過ぎたため、投稿を見送りました。"
                 print(f"見送り: {label} ({did})")
                 write_result(did, "missed", error=msg)
+                notify_line(f"【インスタ予約】見送りました\n{label}\n{msg}\nアプリで日時を決め直してください。")
                 continue
 
             if uid is None:
@@ -238,6 +259,7 @@ def main():
         except Exception as e:
             print(f"投稿失敗: {label} ({did}): {e}")
             write_result(did, "failed", error=str(e))
+            notify_line(f"【インスタ予約】投稿に失敗しました\n{label}（{at_jst:%m/%d %H:%M}予約）\n{str(e)[:300]}")
         finally:
             shutil.rmtree(job_dir, ignore_errors=True)
 
