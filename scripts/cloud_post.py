@@ -178,10 +178,20 @@ def write_result(did, status, permalink=None, posted_at=None, error=None):
 
 
 def notify_line(text):
-    """見送り・失敗をスマホ（LINE）に知らせる。設定がなければ何もしない"""
+    """見送り・失敗をスマホに知らせる。チャットワークの設定があればそちら、なければLINE。どちらもなければ何もしない"""
+    cw, room = (os.environ.get("CHATWORK_API_TOKEN") or "").strip(), (os.environ.get("CHATWORK_ROOM_ID") or "").strip()
+    if cw and room:
+        req = urllib.request.Request(f"https://api.chatwork.com/v2/rooms/{room}/messages",
+                                     data=urllib.parse.urlencode({"body": text}).encode(), method="POST",
+                                     headers={"X-ChatWorkToken": cw})
+        try:
+            urllib.request.urlopen(req, timeout=30).close()
+        except Exception as e:
+            print(f"チャットワーク通知に失敗: {e}")
+        return
     t = (os.environ.get("LINE_CHANNEL_ACCESS_TOKEN") or "").strip()
     if not t:
-        print("LINEの設定がないので通知をスキップしました")
+        print("通知の設定がないので通知をスキップしました")
         return
     body = {"messages": [{"type": "text", "text": text}]}
     user_id = (os.environ.get("LINE_USER_ID") or "").strip()
