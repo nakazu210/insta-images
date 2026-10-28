@@ -178,7 +178,16 @@ def write_result(did, status, permalink=None, posted_at=None, error=None):
 
 
 def notify_line(text):
-    """見送り・失敗をスマホに知らせる。チャットワークの設定があればそちら、なければLINE。どちらもなければ何もしない"""
+    """見送り・失敗をスマホに知らせる。Discord → チャットワーク → LINE の順で、設定のあるものに送る"""
+    hook = (os.environ.get("DISCORD_WEBHOOK_URL") or "").strip()
+    if hook:
+        req = urllib.request.Request(hook, data=json.dumps({"content": text[:1900]}).encode(), method="POST",
+                                     headers={"Content-Type": "application/json", "User-Agent": "insta-post"})
+        try:
+            urllib.request.urlopen(req, timeout=30).close()
+        except Exception as e:
+            print(f"Discord通知に失敗: {e}")
+        return
     cw, room = (os.environ.get("CHATWORK_API_TOKEN") or "").strip(), (os.environ.get("CHATWORK_ROOM_ID") or "").strip()
     if cw and room:
         req = urllib.request.Request(f"https://api.chatwork.com/v2/rooms/{room}/messages",
